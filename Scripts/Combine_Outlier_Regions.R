@@ -99,14 +99,6 @@ enrich_go <- function(x = NULL){
            pvalueCutoff  = 0.05,
            qvalueCutoff  = 0.05)
   
-  cc <- enrichGO(gene          = x,
-           OrgDb         = org.Ce.eg.db,
-           ont           = "CC",
-           pAdjustMethod = "BH",
-           keyType       = 'ENSEMBL',
-           pvalueCutoff  = 0.05,
-           qvalueCutoff  = 0.05)
-  
   bp <- enrichGO(gene          = x,
            OrgDb         = org.Ce.eg.db,
            ont           = "BP",
@@ -114,7 +106,7 @@ enrich_go <- function(x = NULL){
            keyType       = 'ENSEMBL',
            pvalueCutoff  = 0.05,
            qvalueCutoff  = 0.05)
-  return(list(mf, cc, bp))
+  return(list(mf, bp))
 }
 
 common_cds_gene_MF <- enrich_go(x = dplyr::filter(masked_genes, FreqCutoff == "Common") %>% dplyr::pull(WBGeneID))
@@ -122,20 +114,22 @@ intermediate_cds_gene_MF <- enrich_go(x = dplyr::filter(masked_genes, FreqCutoff
 low_cds_gene_MF <- enrich_go(x = dplyr::filter(masked_genes, FreqCutoff == "Low") %>% dplyr::pull(WBGeneID))
 
 barplot(common_cds_gene_MF[[1]])
-barplot(common_cds_gene_MF[[3]])
-
-barplot(intermediate_cds_gene_MF[[1]])
-barplot(intermediate_cds_gene_MF[[3]])
-
-barplot(low_cds_gene_MF[[1]])
-barplot(low_cds_gene_MF[[3]])
+barplot(common_cds_gene_MF[[2]])
 
 goplot(common_cds_gene_MF[[1]])
-goplot(common_cds_gene_MF[[3]])
+goplot(common_cds_gene_MF[[2]])
+
+barplot(intermediate_cds_gene_MF[[1]])
+barplot(intermediate_cds_gene_MF[[2]])
+
+barplot(low_cds_gene_MF[[1]])
+barplot(low_cds_gene_MF[[2]])
+
+
 
 goplot(intermediate_cds_gene_MF[[1]])
-goplot(intermediate_cds_gene_MF[[3]])
+goplot(intermediate_cds_gene_MF[[2]])
 
 goplot(low_cds_gene_MF[[1]])
-goplot(low_cds_gene_MF[[3]])
+goplot(low_cds_gene_MF[[2]])
 
