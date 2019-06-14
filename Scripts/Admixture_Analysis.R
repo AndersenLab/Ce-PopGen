@@ -14,6 +14,8 @@ library(ggthemes)
 # example - 
 # args <- c("DIVERGENT-MASKED")
 # args <- c("GATK-STRELKA_Intersection")
+# args <- c("DIVERGENT-MASKED_Complete")
+# args <- c("GATK-STRELKA_Intersection_Complete")
 args <- commandArgs(TRUE)
 
 analysis_type <- args[1]

@@ -8,6 +8,9 @@ setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
 analysis_type_a <- "GATK-STRELKA_Intersection"
 analysis_type_b <- "DIVERGENT-MASKED"
 
+analysis_type_a <- "GATK-STRELKA_Intersection_Complete"
+analysis_type_b <- "DIVERGENT-MASKED_Complete"
+
 analysis_a <- data.table::fread(glue::glue("Processed_Data/Admixture/{analysis_type_a}_Ancestral_Pops.tsv"))
 analysis_b <- data.table::fread(glue::glue("Processed_Data/Admixture/{analysis_type_b}_Ancestral_Pops.tsv"))
 
