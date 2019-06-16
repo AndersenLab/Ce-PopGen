@@ -3,8 +3,8 @@ library(tidyverse)
 
 setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
 
-analysis_type_a <- "GATK-STRELKA_Intersection"
-analysis_type_b <- "DIVERGENT-MASKED"
+analysis_type_a <- "GATK-STRELKA_Intersection_Complete"
+analysis_type_b <- "DIVERGENT-MASKED_Complete"
 
 load(glue::glue("Data/POPGENOME/{analysis_type_a}/WHOLE_GENOME/Ce_Genome-wide_Neutrality_stats.Rda"))
 pg_a <- neutrality_df
@@ -13,15 +13,15 @@ pg_b <- neutrality_df
 rm(neutrality_df)
 
 unique(pg_a$statistic)
-p_st <- "Tajima.D"
+p_st <- "Fu.Li.F"
 # Pi
 ggplot() +
   aes(x = WindowPosition/1e6, y = value)+
-  facet_grid(.~CHROM, scales = "free")+
+  facet_grid(CHROM~., scales = "free")+
   geom_point( color = "red", data = pg_a %>% dplyr::filter(statistic == p_st) )+
   geom_point(color = "blue", data = pg_b %>% dplyr::filter(statistic == p_st) )+
-  geom_smooth(span = 0.1, se = F, method = "loess", color = "pink", data = pg_a %>% dplyr::filter(statistic == p_st) )+
-  geom_smooth(span = 0.1, se = F, method = "loess", color = "cyan", data = pg_b %>% dplyr::filter(statistic == p_st) )+
+  geom_line( color = "pink", data = pg_a %>% dplyr::filter(statistic == p_st) )+
+  geom_line(color = "cyan", data = pg_b %>% dplyr::filter(statistic == p_st) )+
   theme_bw()+
   theme(legend.box = NULL,
         strip.background = element_blank(),

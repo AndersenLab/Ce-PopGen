@@ -1,16 +1,34 @@
+#!/usr/bin/env Rscript
+
 library(tidyverse)
-library(clusterProfiler)
-library(org.Ce.eg.db)
 
 options(scipen=999)
 
-setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
+#setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
 
-masked_n_remove <- "Data/EIGENSTRAT/DIVERGENT-MASKED/NO_REMOVAL/eigenstrat_no_removal.evac"
-masked_y_remove <- "Data/EIGENSTRAT/DIVERGENT-MASKED/OUTLIER_REMOVAL/eigenstrat_outliers_removed.evac"
+# args
+# 1 - analysis type A - name of folder corresponding to what admixure analysis
+# 2 - analysis type B - name of folder corresponding to what admixure analysis
 
-intersect_n_remove <- "Data/EIGENSTRAT/GATK-STRELKA_Intersection/NO_REMOVAL/eigenstrat_no_removal.evac"
-intersect_y_remove <- "Data/EIGENSTRAT/GATK-STRELKA_Intersection/OUTLIER_REMOVAL/eigenstrat_outliers_removed.evac"
+# example - 
+# args <- c("DIVERGENT-MASKED", "GATK-STRELKA_Intersection")
+# args <- c("DIVERGENT-MASKED_Complete", "GATK-STRELKA_Intersection_Complete")
+# args <- c("DIVERGENT-MASKED", "DIVERGENT-MASKED_Complete")
+# args <- c("GATK-STRELKA_Intersection", "GATK-STRELKA_Intersection_Complete")
+
+args <- commandArgs(TRUE)
+
+
+dir.create("Plots/PCA")
+
+analysis_type_a <- args[1]
+analysis_type_b <- args[2]
+
+A_n_remove <- glue::glue("Data/EIGENSTRAT/{analysis_type_a}/NO_REMOVAL/eigenstrat_no_removal.evac")
+A_y_remove <- glue::glue("Data/EIGENSTRAT/{analysis_type_a}/OUTLIER_REMOVAL/eigenstrat_outliers_removed.evac")
+
+B_n_remove <- glue::glue("Data/EIGENSTRAT/{analysis_type_b}/NO_REMOVAL/eigenstrat_no_removal.evac")
+B_y_remove <- glue::glue("Data/EIGENSTRAT/{analysis_type_b}/OUTLIER_REMOVAL/eigenstrat_outliers_removed.evac")
 
 compare_pca <- function(masked, intersection, removal = F) {
   
@@ -53,23 +71,24 @@ compare_pca <- function(masked, intersection, removal = F) {
   return(pc_cor)
 }
 
-no_removal_pca_cor <- compare_pca(masked_n_remove, intersect_n_remove)
+no_removal_pca_cor <- compare_pca(A_n_remove, B_n_remove)
 
 ggplot(no_removal_pca_cor)+
   aes(x = factor(PC, levels  = PC), y = abs(PC_COR))+
   geom_point() +
   theme_classic(18) +
   theme(axis.text.x = element_text(angle = 90))+
-  labs(y = "Spearman's Correlation", x = "Principal Component")
+  labs(y = "Spearman's Correlation", x = "Principal Component", title = glue::glue("{analysis_type_a} - v - {analysis_type_b} \n NO REMOVAL"))
 
+ggsave(filename = glue::glue("Plots/PCA/PCA_COR_{analysis_type_a}-v-{analysis_type_b}-NOREMOVAL.pdf"), height = 6, width = 12)
 
-removal_pca_cor <- compare_pca(masked_y_remove, intersect_y_remove, removal = T)
+removal_pca_cor <- compare_pca(A_y_remove, B_y_remove, removal = T)
 
 ggplot(removal_pca_cor)+
   aes(x = factor(PC, levels  = PC), y = abs(PC_COR))+
   geom_point() +
   theme_classic(18) +
   theme(axis.text.x = element_text(angle = 90))+
-  labs(y = "Spearman's Correlation", x = "Principal Component")
+  labs(y = "Spearman's Correlation", x = "Principal Component", title = glue::glue("{analysis_type_a} - v - {analysis_type_b} \n REMOVAL"))
 
-
+ggsave(filename = glue::glue("Plots/PCA/PCA_COR_{analysis_type_a}-v-{analysis_type_b}-REMOVAL.pdf"), height = 6, width = 12)
