@@ -37,6 +37,12 @@ all_masks <- population_masks %>%
   dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
   dplyr::summarise(frq = n()/n_sm) %>%
   dplyr::mutate(frq = ifelse(frq > 0.5, 1-frq, frq))
+# 
+# ggplot(all_masks) +
+#   aes(x = END_BIN/1e6, y = frq)+
+#   geom_point()+
+#   facet_grid(CHROM~.) +theme_classic()
+
 
 # generate bed files for each frequency class
 # low
