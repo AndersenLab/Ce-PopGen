@@ -35,7 +35,7 @@ strain_islands <- c("XZ1514" = "#E69F00", "XZ1516" = "#E69F00","XZ1513" = "#E69F
 # Colors from - https://gist.github.com/ollieglass/f6ddd781eeae1d24e391265432297538
 ancestry.colours <- c("A"="gold2", "B"="plum4","C"= "darkorange1", 
                       "D"="lightskyblue2", "E"="firebrick","F"= "burlywood3", "G"="gray51", 
-                      "H"="springgreen4", "I"="lightpink2", "J"="deepskyblue4", "WHOLE_POPULATION"="black", 
+                      "H"="springgreen4", "I"="lightpink2", "J"="deepskyblue4", "K"="black", 
                       "L"="mediumpurple4","M"= "orange","N"= "maroon","O"= "yellow3","P"= "brown4", 
                       "Q"="yellow4", "R"="sienna4", "S"="chocolate", "T"="gray19")
 
@@ -51,7 +51,7 @@ ksum_plot <- ggplot(k_summary)+
   geom_boxplot(outlier.colour = NA)+
   geom_jitter(width = .1)+
   theme_bw()+
-  labs(x = "K", title = analysis_type)
+  labs(x = "K", title = analysis_type) 
 
 
 # generate K summary plot - Supplemental figure XX
@@ -62,7 +62,7 @@ for(kpops in 1:length(grep(".Q", list.files(glue::glue("{data_dir}")), value = T
   K <- as.numeric(strsplit(grep(".Q", list.files(glue::glue("{data_dir}")), value = T)[kpops], split = "\\.")[[1]][4])
   
   # load Q files
-  qfile_name <- grep(pattern = glue::glue("{K}\\.Q$"), value = T, x = list.files(glue::glue("{data_dir}")))
+  qfile_name <- grep(pattern = glue::glue("\\.{K}\\.Q$"), value = T, x = list.files(glue::glue("{data_dir}")))
   qfile <- pophelper::readQ(files = paste0(glue::glue("{data_dir}"),qfile_name))[[1]]
   # add pop names
   colnames(qfile) <- LETTERS[1:K]

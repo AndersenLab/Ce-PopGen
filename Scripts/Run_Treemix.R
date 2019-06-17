@@ -83,6 +83,15 @@ for(kpops in 1:length(grep(".Q", list.files(glue::glue("{data_dir}")), value = T
   
   system(glue::glue("treemix -i {data_dir}Treemix/{treemix_input_name}.gz -o {data_dir}Treemix/{output_name} -root {outgroup_pop} -k 500"))
   
+  system(glue::glue("threepop -i {data_dir}Treemix/{treemix_input_name}.gz -k 500 | grep ';' > {data_dir}Treemix/{treemix_input_name}_threepop" ))
+  
+  threepop <- data.table::fread(glue::glue("{data_dir}Treemix/{treemix_input_name}_threepop"), sep = " ") %>%
+    dplyr::select(tree = V1, F3 = V2, SE = V3, Zscore = V4)
+  
+  system(glue::glue("fourpop -i {data_dir}Treemix/{treemix_input_name}.gz -k 500 | grep ';' > {data_dir}Treemix/{treemix_input_name}_fourpop" ))
+  
+  fourpop <- data.table::fread(glue::glue("{data_dir}Treemix/{treemix_input_name}_fourpop"), sep = " ") %>%
+    dplyr::select(tree = V1, F4 = V2, SE = V3, Zscore = V4)
   
   
   system(paste0(paste0("printf \"", paste(LETTERS[1:K], collapse = '\n')), '\n\" > ', glue::glue("{data_dir}Treemix/poporder")))
