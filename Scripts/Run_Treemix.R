@@ -14,7 +14,7 @@ library(ggthemes)
 # args <- c("DIVERGENT-MASKED", "XZ1516")
 # args <- c("GATK-STRELKA_Intersection", "XZ1516")
 # args <- c("DIVERGENT-MASKED_Complete", "XZ1516")
-# args <- c("GATK-STRELKA_Intersection_Complete", "XZ1516")
+# args <- c("GATK-STRELKA_Intersection_Complete", "ECA191")
 args <- commandArgs(TRUE)
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  Generate Population Summary File for TREEMIX  ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
 
@@ -35,12 +35,12 @@ sample_names <- data.table::fread(glue::glue("data/{analysis_type}_samples.txt")
 
 
 
-for(kpops in 1:length(grep(".Q", list.files(glue::glue("{data_dir}")), value = T))){ 
+for(kpops in 2:length(grep(".Q", list.files(glue::glue("{data_dir}")), value = T))){ 
   
   K <- as.numeric(strsplit(grep(".Q", list.files(glue::glue("{data_dir}")), value = T)[kpops], split = "\\.")[[1]][4])
   
   # load P files
-  pfile_name <- grep(pattern = glue::glue("{K}\\.P$"), value = T, x = list.files(glue::glue("{data_dir}")))
+  pfile_name <- grep(pattern = glue::glue("\\.{K}\\.P$"), value = T, x = list.files(glue::glue("{data_dir}")))
   pfile <- pophelper::readQ(files = paste0(glue::glue("{data_dir}"),pfile_name))[[1]]
   
   # label P file rownames and colnames
@@ -53,7 +53,7 @@ for(kpops in 1:length(grep(".Q", list.files(glue::glue("{data_dir}")), value = T
   })
   
   # load Q files
-  qfile_name <- grep(pattern = glue::glue("{K}\\.Q$"), value = T, x = list.files(glue::glue("{data_dir}")))
+  qfile_name <- grep(pattern = glue::glue("\\.{K}\\.Q$"), value = T, x = list.files(glue::glue("{data_dir}")))
   qfile <- pophelper::readQ(files = paste0(glue::glue("{data_dir}"),qfile_name))[[1]]
   # add pop names
   colnames(qfile) <- LETTERS[1:K]
