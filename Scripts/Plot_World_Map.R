@@ -2,7 +2,7 @@ library(maps)
 library(ggthemes)
 library(ggrepel)
 
-k = 14
+k = 15
 
 ks <- data.table::fread("Processed_Data/Admixture/GATK-STRELKA_Intersection_Complete_Ancestral_Pops.tsv") %>% pull(K) %>% unique()
 
