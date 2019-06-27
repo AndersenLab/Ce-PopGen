@@ -1,0 +1,2 @@
+Data/Diversity/WI.HARD-FILTERED.bed.gz filter=lfs diff=lfs merge=lfs -text
+Data/Diversity/combinedSV.bed filter=lfs diff=lfs merge=lfs -text
