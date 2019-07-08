@@ -17,7 +17,7 @@ args <- commandArgs(TRUE)
 
 analysis_type <- args[1]
 
-data_dir <- glue::glue("Data/POPGENOME/{analysis_type}/SUBPOPs/WINDOW/")
+data_dir <- glue::glue("Data/POPGENOME/{analysis_type}/WHOLE_GENOME/")
 
 # define a color pallette with maximal contrast
 # Colors from - https://gist.github.com/ollieglass/f6ddd781eeae1d24e391265432297538
@@ -32,15 +32,15 @@ ancestry.colours <- c("A"="gold2", "B"="plum4","C"= "darkorange1",
 load(glue::glue("{data_dir}Ce_Genome-wide_Neutrality_stats.Rda")) 
 
 # Set k and load
-kpop = 15
-focal_pops <- c("B","D","E","F","L","O","N")
+# kpop = 15
+# focal_pops <- c("B","D","E","F","L","O","N")
 
 
-nd_df <- neutrality_df %>%
-  dplyr::filter(K == kpop)
+# nd_df <- neutrality_df %>%
+#   dplyr::filter(K == kpop)
 
 
-plot_st <- c("Fu.F_S")
+plot_st <- c("Tajima")
 nd_df %>%
   dplyr::filter(Population %in% c("D", "N"), statistic == plot_st) %>%
   ggplot()+
@@ -50,6 +50,32 @@ nd_df %>%
   facet_grid(CHROM~., scales = "free", space = "free")+
   theme_bw(18)+
   labs(x = "Genomic Position (Mb)")
+
+plot_st <- c("Fu.F_S")
+nd_df %>%
+  dplyr::filter(Population %in% c("E", "O"), statistic == plot_st) %>%
+  ggplot()+
+  aes(x = WindowPosition/1e6, y = value, color = Population) +
+  geom_line()+
+  scale_color_manual(values = ancestry.colours) +
+  facet_grid(CHROM~statistic, scales = "free", space = "free")+
+  theme_bw(18)+
+  labs(x = "Genomic Position (Mb)")
+
+plot_st <- c("Tajima.D")
+neutrality_df %>%
+  dplyr::filter(statistic == plot_st) %>%
+  ggplot()+
+  aes(x = WindowPosition/1e6, y = value) +
+  geom_line()+
+  scale_color_manual(values = ancestry.colours) +
+  facet_grid(.~CHROM, scales = "free", space = "free")+
+  theme_bw(18)+
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))+
+  labs(x = "Genomic Position (Mb)", y = plot_st)
+
+ggsave("Plots/Diversity/TajimasD_populaiton.pdf", height = 6, width = 18)
 
 plot_st <- c("Fu.F_S")
 nd_df %>%

@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 
 library(tidyverse)
-
+library(maps)
+library(ggthemes)
 
 # setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
 
@@ -13,7 +14,7 @@ library(tidyverse)
 # 3 - structural variant bed file
 
 # example - 
-# args <- c("WI_GATK_variant_counts.txt", "WI.HARD-FILTERED.bed.gz","combinedSV.bed")
+# args <- c("INTERSECTION_variant_snp_counts.txt","INTERSECTION_variant_indel_counts.txt", "INTERSECTION_snpeff.bed.gz","combinedSV.bed")
 # args <- c("GATK-STRELKA_Intersection")
 # args <- c("DIVERGENT-MASKED_Complete")
 # args <- c("GATK-STRELKA_Intersection_Complete")
@@ -24,32 +25,109 @@ data_dir <- "Data/Diversity/"
 dir.create("Plots/Diversity")
 
 
-small_v <- data.table::fread(glue::glue("{data_dir}{args[1]}"), col.names = c("CHROM","w_start","w_end","count"))
-large_v <- data.table::fread(glue::glue("{data_dir}{args[3]}"))
-small_v_eff <- readr::read_tsv(glue::glue("{data_dir}{args[2]}"), col_names = F)
+snp_v <- data.table::fread(glue::glue("{data_dir}{args[1]}"), col.names = c("CHROM","w_start","w_end","count"))
+indel_v <- data.table::fread(glue::glue("{data_dir}{args[2]}"), col.names = c("CHROM","w_start","w_end","count"))
+large_v <- data.table::fread(glue::glue("{data_dir}{args[4]}"))
+small_v_eff <- readr::read_tsv(glue::glue("{data_dir}{args[3]}"), col_names = F)
 
+sample_names <- data.table::fread(glue::glue("data/GATK-STRELKA_Intersection_Complete_samples.txt"), header = F) %>% dplyr::pull(V1)
+
+# 
+# > sum(indel_v$count)
+# [1] 390833
+# > sum(snp_v$count)
+# [1] 2369213
 
 # small variant count per bin
-ggplot(small_v)+
-  aes(x = w_start/1e6, y = count)+
-  geom_point(alpha = 0.5)+
+snp_v %>%
+  dplyr::mutate(norm_count = count/max(count)) %>%
+  ggplot()+
+  aes(x = w_start/1e6, y = norm_count)+
+  # geom_point(alpha = 0.5)+
+  geom_smooth()+
+  geom_smooth(color = "red", data = indel_v %>%
+                dplyr::mutate(norm_count = count/max(count)))+
   facet_grid(.~CHROM, space = "free", scales = "free")+
   theme_bw(18) +
-  labs(x = "Genomic Position (Mb)", y = "Variant Count") +
+  labs(x = "Genomic Position (Mb)", y = "Normalized Variant Count") +
   theme(strip.background = element_blank(),
         strip.text = element_text(face = "bold"))
 
 ggsave("Plots/Diversity/Small_Variant_Count.pdf", height = 6, width = 12)
 
+snp_v %>%
+  ggplot()+
+  aes(x = w_start/1e6, y = count)+
+  geom_point(alpha = 0.5)+
+  facet_grid(.~CHROM, space = "free", scales = "free")+
+  theme_bw(18) +
+  labs(x = "Genomic Position (Mb)", y = "SNV Count") +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))
+
+ggsave("Plots/Diversity/SNV_Variant_Count_point.pdf", height = 6, width = 12)
+
 test <- small_v_eff %>%
-  transform(X4 = strsplit(X4, ";")) %>%
+  transform(X6 = strsplit(X6, ";")) %>%
   dplyr::rowwise() %>%
-  dplyr::mutate(freq_miss = sum(grepl("\\./\\.",X4)/330),
-                freq_alt = sum(grepl("1/1",X4)/330),
-                freq_ref = sum(grepl("0/0",X4))/330) %>%
-  dplyr::select(CHROM = X1, POS = X2, X5:freq_ref)
+  dplyr::mutate(freq_miss = sum(grepl("\\./\\.",X6)/330),
+                freq_alt = sum(grepl("1/1",X6)/330),
+                freq_ref = sum(grepl("0/0",X6))/330,
+                miss_st = gsub("=\\./\\.=|=\\./\\.",",",paste(grep("\\./\\.",X6, value = T), collapse = "=")),
+                alt_st = gsub("=1/1=|=1/1",",",paste(grep("1/1",X6, value = T), collapse = "=")),
+                ref_st = gsub("=0/0=|=0/0",",",paste(grep("0/0",X6, value = T), collapse = "="))) %>%
+  dplyr::select(CHROM = X1, POS = X2, REF = X4, ALT = X5, X7:ref_st) %>%
+  dplyr::filter(freq_alt != 0 )
 
 write_tsv(test, glue::glue("{data_dir}Processed_Variant_Effects.tsv.gz"),col_names = F)
+
+for(sm in sample_names){
+  alt_ct <- length(grep(glue::glue("{sm},"), test$alt_st))
+  temp_alt_ct <- data.frame(sample = sm, alt_ct = alt_ct)
+  if(!exists("sm_alt_ct")){
+    sm_alt_ct <- temp_alt_ct
+  } else {
+    sm_alt_ct <- dplyr::bind_rows(sm_alt_ct, temp_alt_ct)
+  }
+}
+
+isolation_info <- googlesheets::gs_key("1V6YHzblaDph01sFDI8YK_fP0H7sVebHQTXypGdiQIjI") %>%
+  googlesheets::gs_read("WI C. elegans") %>%
+  dplyr::filter(reference_strain == 1)%>%
+  dplyr::select(sample = isotype, long = longitude, lat = latitude, state, country)%>%
+  dplyr::filter(lat != "None")%>%
+  dplyr::filter(!is.na(lat)) %>%
+  dplyr::distinct(sample, long, lat, .keep_all = TRUE) %>%
+  dplyr::left_join(sm_alt_ct, ., by = "sample") %>%
+  dplyr::arrange((alt_ct)) %>%
+  dplyr::mutate(size_point = scale(1:n())) %>%
+  dplyr::mutate(size_point = ifelse(size_point <= quantile(size_point, probs = 0.90), 1, 2),
+                lat = as.numeric(lat),
+                long = as.numeric(long))
+
+world <- map_data("world")
+world <- world[world$region != "Antarctica",] # intercourse antarctica
+
+write_tsv(isolation_info, glue::glue("{data_dir}SM_ALT_counts.tsv"),col_names = F)
+
+
+ggplot()+ geom_map(data=world, map=world,
+                   aes(x=long, y=lat, map_id=region),
+                   color="black", fill="white", size=0.5)+
+  theme_map(18)+
+  geom_point(aes(long, lat, fill = alt_ct, size = factor(size_point)),data=isolation_info, color = "black", alpha = 0.5, shape = 21)+
+  scale_fill_viridis_c(option = "A")+
+  labs(fill = "ALT Count", size = "90th Quantile")
+
+ggsave("Plots/Diversity/ALT_Count_World_Map.pdf", height = 10, width = 20)
+
+ggplot(isolation_info)+
+  aes(x = (alt_ct)) +
+  geom_histogram()+
+  theme_bw(18) +
+  labs(x = "ALT Count", y = "Number of strains")
+
+ggsave("Plots/Diversity/ALT_Count_histogram.pdf", height = 6, width = 8)
 
 hi_eff <- test %>%
   dplyr::group_by(CHROM) %>%
@@ -74,6 +152,19 @@ hi_eff %>%
 
 ggsave("Plots/Diversity/Small_Variant_SnpEff_High.pdf", height = 6, width = 18)
 
+# test %>%
+#   dplyr::group_by(CHROM) %>%
+#   dplyr::ungroup() %>%
+#   dplyr::mutate(X7 = ifelse(is.na(X7), "INTERGENIC", X7)) %>%
+#   ggplot()+
+#   aes(x = freq_alt,fill = X7)+
+#   geom_density(binwidth = 0.01, alpha = 0.5)+
+#   theme_bw(18) +
+#   # facet_grid(X7~.)+
+#   theme(axis.text.x = element_text(size =8))+
+#   labs(x = "SnpEff Prediction", y = "Count")
+
+
 # Distribution of high impact variation
 hi_eff %>%
   dplyr::group_by(X6) %>%
@@ -97,7 +188,7 @@ ggsave("Plots/Diversity/Small_Variant_SnpEff_High_Distribution.pdf", height = 6,
 
 # unique genes with predicted LOF
 length(unique(hi_eff$X9))
-#[1] 10484
+#[1] 8776
 
 large_v %>%
   dplyr::distinct(CHROM, START, END, SAMPLE, .keep_all = T) %>%

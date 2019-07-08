@@ -1,4 +1,4 @@
-# balancing selection 
+# balancing selection gene popgenome
 bedtools intersect -a Data/Divergent_Masks/Masks_By_Type/Balancing_Selection.bed -b Data/Ce_Annotations/gene.protein_coding.bed -wo |\
 cut -f -8,14 |\
 cut -f 1,4 -d';' |\

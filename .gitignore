@@ -3,3 +3,6 @@ Data/POPGENOME/GATK-STRELKA_Intersection_Complete/SUBPOPs/WINDOW/Ce_Genome-wide_
 Data/POPGENOME/GATK-STRELKA_Intersection_Complete/SUBPOPs/WINDOW/Ce_Genome-wide_Neutrality_stats.Rda
 Data/Diversity/combinedSV.bed
 Data/Diversity/WI.HARD-FILTERED.bed.gz
+Data/Diversity/INTERSECTION_snpeff.bed.gz
+Data/Diversity/Processed_Variant_Effects.tsv.gz
+Data/Diversity/*

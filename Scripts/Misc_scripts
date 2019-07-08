@@ -1,0 +1,15 @@
+# variant count in windows
+
+bcftools view -i 'TYPE="snp"' /projects/b1059/projects/Stefan/CePopGen-nf/input_files/Ce330_GATK4_STRELKA2_Intersect.vcf.gz |\
+bedtools coverage -a windows.bed -b stdin -counts > INTERSECTION_variant_snp_counts.txt
+
+bcftools view -i 'TYPE="indel"' /projects/b1059/projects/Stefan/CePopGen-nf/input_files/Ce330_GATK4_STRELKA2_Intersect.vcf.gz |\
+bedtools coverage -a windows.bed -b stdin -counts > INTERSECTION_variant_indel_counts.txt
+
+
+bcftools query /projects/b1059/projects/Stefan/CePopGen-nf/input_files/Ce330_GATK4_STRELKA2_Intersect.vcf.gz -f '[%CHROM\t%POS\t%END\t%SAMPLE\t%GT\t%INFO/ANN\n]' |\
+awk -F"|" '{print $1, $2, $3, $4, $5}' OFS="\t" | bgzip > INTERSECTION_snpeff.bed.gz
+
+
+bcftools query /projects/b1059/projects/Stefan/CePopGen-nf/input_files/Ce330_GATK4_STRELKA2_Intersect.vcf.gz -f '%CHROM\t%POS\t%END\t%REF\t%ALT\t[%SAMPLE=%GT;]\t%INFO/ANN\n' |\
+awk -F"|" '{print $1, $2, $3, $4, $5}' OFS="\t" | bgzip > INTERSECTION_snpeff.bed.gz

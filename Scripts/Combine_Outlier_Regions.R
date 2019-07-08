@@ -12,6 +12,41 @@ dir.create(pr_mask_directory)
 
 masked_directory <- "Data/Divergent_Masks/Processed_Masks/"
 
+join_masks <- function(mask_file = NULL, jump_tolerance = 1000){
+  common_cluster <- NA
+  common_cluster_start <- NA
+  
+  for (i in c(1:nrow(mask_file)-1)) {
+    
+    if(i==1){
+      
+      common_cluster[i] <- ifelse(mask_file$END_BIN[i] == mask_file$START_BIN[i+1], 'yes', 'no')
+      common_cluster_start[i] <- mask_file$START_BIN[i]
+      
+    } else {
+      
+      common_cluster[i] <- ifelse(mask_file$END_BIN[i-1] > mask_file$START_BIN[i] - jump_tolerance | mask_file$END_BIN[i] > mask_file$START_BIN[i+1] - jump_tolerance, 'yes', 'no')
+      common_cluster_start[i] <- ifelse(mask_file$CHROM[i] == mask_file$CHROM[i-1] & common_cluster[i] == 'yes', 
+                                        ifelse(mask_file$END_BIN[i-1] > mask_file$START_BIN[i] - jump_tolerance | mask_file$END_BIN[i] > mask_file$START_BIN[i+1] - jump_tolerance, 
+                                               ifelse(common_cluster[i-1] == "no", mask_file$START_BIN[i], 
+                                                      ifelse(mask_file$END_BIN[i-1] == mask_file$START_BIN[i], common_cluster_start[i-1], mask_file$START_BIN[i])), mask_file$START_BIN[i]), mask_file$START_BIN[i])
+      
+    }
+  }
+  
+  common_cluster[nrow(mask_file)] <- NA
+  common_cluster_start[nrow(mask_file)] <- NA
+  
+  mask_file_cluster <- data.frame(mask_file, common_cluster, common_cluster_start) %>%
+    dplyr::group_by(CHROM, common_cluster_start) %>%
+    dplyr::mutate(common_cluster_size=ifelse(is.na(common_cluster_start), 1000, n()*1000)) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(common_cluster_end=common_cluster_start+common_cluster_size)
+  
+  
+}
+
+
 mask_files <- list.files(masked_directory)
 
 n_sm <- length(mask_files)
@@ -19,11 +54,15 @@ n_sm <- length(mask_files)
 # mask frequency thresholds
 mask_frq_thresh <- c(0.01, 0.05)
 
+joined_masks <- list()
 # Extract masked regions and retain type of mask
 for(sm in 1:length(mask_files)){
   temp_sm_mask <- data.table::fread(glue::glue("{masked_directory}{mask_files[sm]}")) %>%
     dplyr::select(CHROM, START_BIN, END_BIN, STRAIN, window_mask) %>%
     dplyr::filter(window_mask != "Pass")
+  
+  
+  joined_masks[[sm]] <- join_masks(temp_sm_mask)
   
   if(!exists("population_masks")){
     population_masks <- temp_sm_mask
@@ -32,17 +71,63 @@ for(sm in 1:length(mask_files)){
   }
 }
 
+joined_masks <- dplyr::bind_rows(joined_masks)
+
 # get mask frequency
 all_masks <- population_masks %>%
   dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
   dplyr::summarise(frq = n()/n_sm) %>%
   dplyr::mutate(frq = ifelse(frq > 0.5, 1-frq, frq))
-# 
-# ggplot(all_masks) +
-#   aes(x = END_BIN/1e6, y = frq)+
-#   geom_point()+
-#   facet_grid(CHROM~.) +theme_classic()
 
+population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
+  dplyr::summarise(frq = n()/n_sm) %>%
+  ggplot() +
+    aes(x = END_BIN/1e6, y = frq)+
+    geom_point()+
+    facet_grid(.~CHROM, scales = "free", space = "free") +
+  theme_bw(18) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))+
+  labs(x = "Genomic Position (Mb)", y = "Frequency")
+
+ggsave("Plots/Diversity/Masked_region_frequency_genome_wide.pdf", height = 6, width = 18)
+
+population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
+  dplyr::summarise(frq = n()/n_sm) %>%
+  ggplot() +
+  aes(x = frq)+
+  geom_histogram(binwidth = 0.01)+
+  theme_bw(18) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))+
+  labs(x = "Frequency", y = "Count")
+
+ggsave("Plots/Diversity/Masked_region_frequency_histogram.pdf", height = 6, width = 10)
+
+
+
+population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
+  dplyr::summarise(frq = n()/n_sm) %>%
+  dplyr::filter(frq < 0.004) %>% nrow()
+# [1] 8045
+population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
+  dplyr::summarise(frq = n()/n_sm) %>%
+  dplyr::filter(frq < 0.01) %>% nrow()
+# [1] 13760
+population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
+  dplyr::summarise(frq = n()/n_sm) %>%
+  dplyr::filter(frq < 0.05) %>% nrow()
+# [1] 24816
+population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
+  dplyr::summarise(frq = n()/n_sm) %>%
+  nrow()
+# [1] 47014
 
 # generate bed files for each frequency class
 # low
@@ -163,7 +248,7 @@ for(frequency_cutoff in c("Low","Intermediate","Common")) {
   for(enrich_type in 1:4){
     
     dp <- tryCatch({
-      dotplot(enrichment_results[[enrich_type]])
+      dotplot(enrichment_results[[enrich_type]], showCategory = 20)
     }, error = function(error_condition) {
       x <- c("NO ENRICHMENT")
       return(x)
