@@ -73,6 +73,9 @@ for(sm in 1:length(mask_files)){
 
 joined_masks <- dplyr::bind_rows(joined_masks)
 
+write_tsv(joined_masks, path = glue::glue("{pr_mask_directory}Combine_neighboring_masks.tsv.gz"), col_names = T)
+
+
 # get mask frequency
 all_masks <- population_masks %>%
   dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
