@@ -190,11 +190,89 @@ ggsave("Plots/Diversity/Small_Variant_SnpEff_High_Distribution.pdf", height = 6,
 length(unique(hi_eff$X9))
 #[1] 8776
 
-large_v %>%
+# filter svs found by two variants
+multi_support_sv <- large_v %>%
+  dplyr::filter(SVTYPE_CLEAN!="SVTYPE_CLEAN") %>%
+  dplyr::mutate(SIZE = as.numeric(SIZE),
+                SUPPORT = as.numeric(SUPPORT)) %>%
+  dplyr::filter(SIZE < 1e5, CHROM != "MtDNA") %>%
+  dplyr::filter(SUPPORT > 2 | SVTYPE == "INS") 
+
+# total svs
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::group_by(SVTYPE_CLEAN) %>%
+  dplyr::summarise(sv_ct = n(),
+                   med_size = median(as.numeric(SIZE), na.rm = T))%>%
+  dplyr::ungroup()%>%
+  dplyr::summarise(ssv = sum(sv_ct))
+
+# genomic distribution
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END,SVTYPE_CLEAN, .keep_all = T) %>%
+  ggplot() +
+  aes(x = as.numeric(START)/1e6, fill = SVTYPE_CLEAN) +
+  geom_histogram(binwidth = 0.15)+
+  facet_grid(.~CHROM, scales = "free")+
+  theme_bw(18) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))+
+  scale_fill_manual(values =c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"))+
+  labs(x = "Genomic Position (Mb)", fill = "SVTYPE", y = "Count") 
+
+ggsave("Plots/Diversity/Structural_Variant_Distribution_by_type.pdf", height = 6, width = 18)
+
+# counts and size by type
+multi_support_sv %>%
+dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(SIZE = as.numeric(SIZE)) %>%
+  dplyr::group_by(SVTYPE_CLEAN) %>%
+  dplyr::summarise(sv_ct = n(),
+                   med_size = median(as.numeric(SIZE), na.rm = T))
+
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(SIZE = as.numeric(SIZE)) %>%
+  dplyr::filter(SVTYPE_CLEAN!="INS")%>%
+  ggplot()+
+  aes(x = SVTYPE_CLEAN, y = log(SIZE), fill = SVTYPE_CLEAN)+
+  geom_boxplot() +
+  scale_fill_manual(values =c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
+  theme_bw(18)+
+  theme(axis.title.x = element_blank())+
+  labs(fill = "SVTYPE")
+ggsave("Plots/Diversity/Structural_size_boxplot.pdf", height = 4, width = 8)
+
+# counts and size by type and chrom
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(SIZE = as.numeric(SIZE)) %>%
+  dplyr::group_by(SVTYPE_CLEAN, CHROM) %>%
+  dplyr::summarise(sv_ct = n(),
+                   med_size = median(as.numeric(SIZE), na.rm = T)) %>%
+  dplyr::mutate(frac_by_chrom = sv_ct/sum(sv_ct)) %>%
+  dplyr::group_by(CHROM) %>%
+  dplyr::mutate(avg_by_chrom = mean(frac_by_chrom)) %>%
+  dplyr::arrange(SVTYPE_CLEAN,desc(frac_by_chrom))%>%
+  View()
+
+# frequency
+multi_support_sv %>%
   dplyr::distinct(CHROM, START, END, SAMPLE, .keep_all = T) %>%
   dplyr::group_by(CHROM, START, END, SVTYPE_CLEAN) %>%
   dplyr::mutate(st_ct = n()/330) %>%
-  dplyr::distinct(st_ct) %>%
+  dplyr::ungroup()%>% 
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  # dplyr::group_by(SVTYPE_CLEAN) %>%
+  dplyr::summarise(med_f = median(st_ct),
+                   meanf = mean(st_ct))
+
+multi_support_sv %>%
+  dplyr::filter(SVTYPE_CLEAN!="SVTYPE_CLEAN") %>%
+  dplyr::distinct(CHROM, START, END, SAMPLE, .keep_all = T) %>%
+  dplyr::group_by(CHROM, START, END, SVTYPE_CLEAN) %>%
+  dplyr::mutate(st_ct = n()/330) %>%
+  dplyr::distinct(st_ct,.keep_all=T) %>%
   ggplot()+
   aes(x = st_ct)+
   geom_histogram(binwidth = 0.01)+
@@ -203,11 +281,62 @@ large_v %>%
 
 ggsave("Plots/Diversity/Structural_Variant_Frequency.pdf", height = 4, width = 8)
 
+# frequency by type
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, SAMPLE, .keep_all = T) %>%
+  dplyr::group_by(CHROM, START, END, SVTYPE_CLEAN) %>%
+  dplyr::mutate(st_ct = n()/330) %>%
+  dplyr::ungroup()%>% 
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::group_by(SVTYPE_CLEAN) %>%
+  dplyr::summarise(med_f = median(st_ct),
+                   meanf = mean(st_ct))
+
+# sv by genomic region
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(clean_region = ifelse(SNPEFF_PRED == "intron_variant", "intron", 
+                                      ifelse(TRANSCRIPT != "Intergenic", "genic","Intergenic")))%>%
+  dplyr::ungroup()%>% 
+  dplyr::group_by(clean_region) %>%
+  dplyr::summarise(region_ct = n())
+
+# sv by genomic region - genic onlu
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(clean_region = ifelse(SNPEFF_PRED == "intron_variant", "intron", 
+                                      ifelse(TRANSCRIPT != "Intergenic", "genic","Intergenic")))%>%
+  dplyr::filter(clean_region == "genic")%>%
+  dplyr::ungroup()%>% 
+  dplyr::group_by(SNPEFF_EFF) %>%
+  dplyr::summarise(ef_ct = n())
+
+# sv by type by genomic region - genic onlu
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(clean_region = ifelse(SNPEFF_PRED == "intron_variant", "intron", 
+                                      ifelse(TRANSCRIPT != "Intergenic", "genic","Intergenic")))%>%
+  dplyr::filter(clean_region == "genic")%>%
+  dplyr::ungroup()%>% 
+  dplyr::group_by(SNPEFF_EFF,SVTYPE_CLEAN) %>%
+  dplyr::summarise(ef_ct = n())
+
+# sv by type by genomic region - genic onlu - high only
+multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(clean_region = ifelse(SNPEFF_PRED == "intron_variant", "intron", 
+                                      ifelse(TRANSCRIPT != "Intergenic", "genic","Intergenic")))%>%
+  dplyr::filter(clean_region == "genic",SNPEFF_EFF=="HIGH")%>%
+  dplyr::ungroup()%>%
+  dplyr::mutate(u_genes = length(unique(TRANSCRIPT)))
+
+
 large_v %>%
   dplyr::mutate(SIZE = as.numeric(SIZE)) %>%
   dplyr::filter(SIZE < 1e5, CHROM != "MtDNA") %>%
   dplyr::mutate(SUPPORT = as.numeric(SUPPORT)) %>%
   dplyr::filter(SUPPORT > 2 || SVTYPE == "INS") %>%
+  dplyr::distinct(CHROM, START, END,SVTYPE_CLEAN, .keep_all = T) %>%
   ggplot() +
   aes(x = as.numeric(START)/1e6, xend = as.numeric(END)/1e6, y=SIZE, yend=SIZE, color = SVTYPE_CLEAN) +
   geom_segment(size =1, arrow = arrow(length = unit(0.1,"cm")))+
@@ -221,5 +350,5 @@ large_v %>%
   scale_color_manual(values =c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"))+
   labs(x = "Genomic Position (Mb)", color = "SVTYPE", y = "Structural Variant Size") 
 
-ggsave("Plots/Diversity/Structural_Variant_Distribution.pdf", height = 10, width = 18)
+ggsave("Plots/Diversity/Structural_Variant_Distribution_by_type_size.pdf", height = 10, width = 18)
 

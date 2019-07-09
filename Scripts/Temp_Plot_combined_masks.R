@@ -1,6 +1,12 @@
 library(maps)
 library(ggthemes)
 library(ggrepel)
+# devtools::install_github('kevinblighe/PCAtools')
+library(PCAtools)
+library(tidyverse)
+setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
+pr_mask_directory <- "Data/Divergent_Masks/Masks_By_Type/"
+joined_masks <- read_tsv( glue::glue("{pr_mask_directory}Combine_neighboring_masks.tsv.gz"), col_names = T)
 
 joined_masks %>%
   dplyr::filter(common_cluster_size>1000) %>%
@@ -102,3 +108,72 @@ ggplot()+ geom_map(data=world, map=world,
 1
 # largest cluster
 28
+
+
+comb_mask_matrix <- joined_masks %>%
+  tidyr::unite(mask_region, CHROM, common_cluster_start, common_cluster_end, sep="_") %>%
+  dplyr::select(mask_region, STRAIN) %>%
+  dplyr::mutate(GT = 1) %>%
+  dplyr::distinct(mask_region, STRAIN, .keep_all=T) %>%
+  tidyr::spread(STRAIN, GT)
+
+
+comb_mask_matrix <- population_masks %>%
+  tidyr::unite(mask_region, CHROM, START_BIN, END_BIN, sep="_") %>%
+  dplyr::select(mask_region, STRAIN) %>%
+  dplyr::mutate(GT = 1) %>%
+  dplyr::distinct(mask_region, STRAIN, .keep_all=T) %>%
+  tidyr::spread(STRAIN, GT)
+
+comb_mask_matrix[is.na(comb_mask_matrix)] <- 0
+
+isolation_info <- googlesheets::gs_key("1V6YHzblaDph01sFDI8YK_fP0H7sVebHQTXypGdiQIjI") %>%
+  googlesheets::gs_read("WI C. elegans") %>%
+  dplyr::filter(reference_strain == 1)%>%
+  dplyr::select(STRAIN = isotype, long = longitude, lat = latitude, state, country, substrate, landscape)%>%
+  dplyr::filter(lat != "None")%>%
+  dplyr::mutate(lat = as.numeric(lat),
+                long = as.numeric(long))
+
+
+metadata <- data.frame(isolation_info[,1:7]) %>%
+  dplyr::arrange(STRAIN) %>%
+  na.omit() %>%
+  dplyr::mutate(n_sub = as.numeric(factor(substrate)),
+                n_land = as.numeric(factor(landscape))) %>%
+  dplyr::group_by(substrate) %>%
+  dplyr::mutate(ct_sub = n()) %>%
+  dplyr::filter(ct_sub > 5) %>%
+  dplyr::group_by(landscape) %>%
+  dplyr::mutate(ct_sub = n()) %>%
+  dplyr::filter(ct_sub > 5) %>%
+  dplyr::select(-ct_sub) %>%
+  dplyr::ungroup()
+
+row.names(metadata) <- metadata$STRAIN
+
+x <- comb_mask_matrix[colnames(comb_mask_matrix) %in% metadata$STRAIN]
+
+row.names(x)  <- comb_mask_matrix$mask_region
+
+p <- pca(x, metadata = metadata)
+
+screeplot(p,
+          components = getComponents(p, 1:20),
+          hline = 80, vline = 27) +
+  geom_text(aes(20, 80, label = '80% explained variation', vjust = -1))
+
+eigencorplot(p, metavars = c('long','lat',"n_sub","n_land"),components = getComponents(p, seq(20)))
+
+pairsplot(p)
+pairsplot(p,colby = "lat", getComponents(p, c(1,3,4,5,7,8,10)), legendPosition = "left")
+
+plotloadings(p,components = getComponents(p, c(1,3,4,5,7,8,10)))
+
+
+# substrate
+ldplot <- plotloadings(p,components = getComponents(p, c(7,8,10,18,20)))
+
+pairsplot(p,colby = "substrate", getComponents(p, c(7,8,10,18,20)), legendPosition = "left")
+
+loadings_cor_subs <- ldplot$data
