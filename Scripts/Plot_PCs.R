@@ -3,7 +3,7 @@
 library(tidyverse)
 
 options(scipen=999)
-
+source("Scripts/Figure_Themes.R")
 #setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
 
 # args
@@ -76,19 +76,21 @@ no_removal_pca_cor <- compare_pca(A_n_remove, B_n_remove)
 ggplot(no_removal_pca_cor)+
   aes(x = factor(PC, levels  = PC), y = abs(PC_COR))+
   geom_point() +
-  theme_classic(18) +
-  theme(axis.text.x = element_text(angle = 90))+
+  base_theme+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.line = element_line())+
   labs(y = "Spearman's Correlation", x = "Principal Component", title = glue::glue("{analysis_type_a} - v - {analysis_type_b} \n NO REMOVAL"))
 
-ggsave(filename = glue::glue("Plots/PCA/PCA_COR_{analysis_type_a}-v-{analysis_type_b}-NOREMOVAL.pdf"), height = 6, width = 12)
+ggsave(filename = glue::glue("Plots/PCA/PCA_COR_{analysis_type_a}-v-{analysis_type_b}-NOREMOVAL.pdf"), height = 4, width = 12)
 
 removal_pca_cor <- compare_pca(A_y_remove, B_y_remove, removal = T)
 
 ggplot(removal_pca_cor)+
   aes(x = factor(PC, levels  = PC), y = abs(PC_COR))+
   geom_point() +
-  theme_classic(18) +
-  theme(axis.text.x = element_text(angle = 90))+
+  base_theme+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.line = element_line())+
   labs(y = "Spearman's Correlation", x = "Principal Component", title = glue::glue("{analysis_type_a} - v - {analysis_type_b} \n REMOVAL"))
 
-ggsave(filename = glue::glue("Plots/PCA/PCA_COR_{analysis_type_a}-v-{analysis_type_b}-REMOVAL.pdf"), height = 6, width = 12)
+ggsave(filename = glue::glue("Plots/PCA/PCA_COR_{analysis_type_a}-v-{analysis_type_b}-REMOVAL.pdf"), height = 4, width = 12)

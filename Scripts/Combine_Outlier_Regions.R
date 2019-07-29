@@ -4,7 +4,7 @@ library(org.Ce.eg.db)
 library(biomaRt)
 
 options(scipen=999)
-
+source("Scripts/Figure_Themes.R")
 setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
 
 pr_mask_directory <- "Data/Divergent_Masks/Masks_By_Type/"
@@ -12,7 +12,7 @@ dir.create(pr_mask_directory)
 
 masked_directory <- "Data/Divergent_Masks/Processed_Masks/"
 
-join_masks <- function(mask_file = NULL, jump_tolerance = 1000){
+join_masks <- function(mask_file = NULL, jump_tolerance = 10000){
   common_cluster <- NA
   common_cluster_start <- NA
   
@@ -58,7 +58,7 @@ joined_masks <- list()
 # Extract masked regions and retain type of mask
 for(sm in 1:length(mask_files)){
   temp_sm_mask <- data.table::fread(glue::glue("{masked_directory}{mask_files[sm]}")) %>%
-    dplyr::select(CHROM, START_BIN, END_BIN, STRAIN, window_mask) %>%
+    dplyr::select(CHROM, START_BIN, END_BIN, STRAIN, window_mask, COUNT) %>%
     dplyr::filter(window_mask != "Pass")
   
   
@@ -76,6 +76,26 @@ joined_masks <- dplyr::bind_rows(joined_masks)
 write_tsv(joined_masks, path = glue::glue("{pr_mask_directory}Combine_neighboring_masks.tsv.gz"), col_names = T)
 write_tsv(population_masks, path = glue::glue("{pr_mask_directory}All_Strain_Masked_Regions.tsv.gz"), col_names = T)
 
+population_masks <- read_tsv(glue::glue("{pr_mask_directory}All_Strain_Masked_Regions.tsv.gz"), col_names = T)
+
+all_masks <- population_masks %>%
+  dplyr::group_by(CHROM, START_BIN, END_BIN, window_mask) %>%
+  dplyr::summarise(frq = n()/n_sm)
+
+# Mb of genome
+all_masks %>%
+  dplyr::distinct(CHROM, START_BIN, END_BIN) %>%
+  nrow() * 1000 / 1e6
+
+
+p <- ggplot(all_masks, aes(frq)) + stat_ecdf(geom = "step") +xlim(0,0.75)
+p + stat_ecdf(geom = "step", aes(frq, color = window_mask), data = all_masks %>% dplyr::filter( window_mask %in% c("Masked_Outlier","Masked_SV_count","Masked_Count","Masked_Low_Coverage","Masked_Low_Coverage","Masked_SV_count_cov"))) +
+  base_theme +
+  labs(x = "Divergent window frequency", y = "Cumulative distribution", color = "Mask Type") +
+  theme(axis.line = element_line())
+
+ggsave("Plots/Diversity/Masked_region_ecdf.pdf", height = 4, width = 12)
+
 # get mask frequency
 all_masks <- population_masks %>%
   dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
@@ -89,12 +109,13 @@ population_masks %>%
     aes(x = END_BIN/1e6, y = frq)+
     geom_point()+
     facet_grid(.~CHROM, scales = "free", space = "free") +
-  theme_bw(18) +
+  base_theme+
   theme(strip.background = element_blank(),
-        strip.text = element_text(face = "bold"))+
+        strip.text = element_text(face = "bold"),
+        axis.line = element_line())+
   labs(x = "Genomic Position (Mb)", y = "Frequency")
 
-ggsave("Plots/Diversity/Masked_region_frequency_genome_wide.pdf", height = 6, width = 18)
+ggsave("Plots/Diversity/Masked_region_frequency_genome_wide.pdf", height = 4, width = 12)
 
 population_masks %>%
   dplyr::group_by(CHROM, START_BIN, END_BIN) %>%
@@ -102,12 +123,13 @@ population_masks %>%
   ggplot() +
   aes(x = frq)+
   geom_histogram(binwidth = 0.01)+
-  theme_bw(18) +
+  base_theme+
   theme(strip.background = element_blank(),
-        strip.text = element_text(face = "bold"))+
+        strip.text = element_text(face = "bold"),
+        axis.line = element_line())+
   labs(x = "Frequency", y = "Count")
 
-ggsave("Plots/Diversity/Masked_region_frequency_histogram.pdf", height = 6, width = 10)
+ggsave("Plots/Diversity/Masked_region_frequency_histogram.pdf", height = 4, width = 12)
 
 
 
@@ -318,6 +340,56 @@ for(frequency_cutoff in c("Low","Intermediate","Common")) {
   }
 }
 
+####### variant counts per window
+
+
+joined_masks <- list()
+# Extract masked regions and retain type of mask
+for(sm in 1:length(mask_files)){
+  temp_sm_mask <- data.table::fread(glue::glue("{masked_directory}{mask_files[sm]}")) %>%
+    dplyr::select(CHROM, START_BIN, END_BIN, STRAIN, window_mask, COUNT) 
+  
+  if(!exists("population_masks")){
+    population_masks <- temp_sm_mask
+  } else {
+    population_masks <- dplyr::bind_rows(population_masks, temp_sm_mask)
+  }
+}
+
+ct_per_strain <- population_masks %>%
+  dplyr::mutate(ft = ifelse(window_mask == "Pass", "Pass", "mask")) %>%
+  dplyr::group_by(STRAIN, ft) %>%
+  dplyr::summarise(ct = sum(COUNT),
+                   g_size = n()*1000/1e6) %>%
+  na.omit() %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(STRAIN) %>%
+  dplyr::mutate(f_ft = ct/sum(ct),
+                g_sz = g_size/sum(g_size))
+
+ct_per_strain %>%
+  ggplot()+
+  aes(x = f_ft, fill = ft) + geom_histogram(alpha = 0.5)
+
+ct_per_strain %>%
+  ggplot()+
+  aes(x = g_sz, fill = ft) + geom_histogram(alpha = 0.5)
+
+ct_per_strain %>%
+  ggplot()+
+  aes(x = g_sz, y = f_ft, color = ft) + geom_point(alpha = 0.5) +
+  labs(x = "Fraction of Genome", y = "Fraction of variants", color = "Filter")+
+  base_theme
+
+
+ct_per_strain %>%
+  dplyr::group_by(ft)%>%
+  dplyr::summarise(av_ct = median(f_ft),
+                   av_sz = median(g_sz))
+
+unique(population_masks$window_mask)
+
+View(dplyr::filter(population_masks, is.na(window_mask)))
 
 
 

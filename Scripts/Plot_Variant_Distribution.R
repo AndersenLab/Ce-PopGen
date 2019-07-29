@@ -20,6 +20,8 @@ library(ggthemes)
 # args <- c("GATK-STRELKA_Intersection_Complete")
 args <- commandArgs(TRUE)
 
+source("Scripts/Figure_Themes.R")
+
 data_dir <- "Data/Diversity/"
 
 dir.create("Plots/Diversity")
@@ -48,24 +50,27 @@ snp_v %>%
   geom_smooth(color = "red", data = indel_v %>%
                 dplyr::mutate(norm_count = count/max(count)))+
   facet_grid(.~CHROM, space = "free", scales = "free")+
-  theme_bw(18) +
+  base_theme +
   labs(x = "Genomic Position (Mb)", y = "Normalized Variant Count") +
   theme(strip.background = element_blank(),
-        strip.text = element_text(face = "bold"))
+        strip.text = element_text(face = "bold"),
+        axis.line = element_line())
 
-ggsave("Plots/Diversity/Small_Variant_Count.pdf", height = 6, width = 12)
+ggsave("Plots/Diversity/Small_Variant_Count.pdf", height = 4, width = 12)
 
 snp_v %>%
   ggplot()+
   aes(x = w_start/1e6, y = count)+
-  geom_point(alpha = 0.5)+
+  # geom_histogram(stat= "identity")+
+  geom_line()+
   facet_grid(.~CHROM, space = "free", scales = "free")+
-  theme_bw(18) +
+  base_theme +
   labs(x = "Genomic Position (Mb)", y = "SNV Count") +
   theme(strip.background = element_blank(),
-        strip.text = element_text(face = "bold"))
+        strip.text = element_text(face = "bold"),
+        axis.line = element_line())
 
-ggsave("Plots/Diversity/SNV_Variant_Count_point.pdf", height = 6, width = 12)
+ggsave("Plots/Diversity/SNV_Variant_Count_point.pdf", height = 4, width = 12)
 
 test <- small_v_eff %>%
   transform(X6 = strsplit(X6, ";")) %>%
@@ -81,8 +86,10 @@ test <- small_v_eff %>%
 
 write_tsv(test, glue::glue("{data_dir}Processed_Variant_Effects.tsv.gz"),col_names = F)
 
+test <- read_tsv(glue::glue("{data_dir}Processed_Variant_Effects.tsv.gz"),col_names = F)
+
 for(sm in sample_names){
-  alt_ct <- length(grep(glue::glue("{sm},"), test$alt_st))
+  alt_ct <- length(grep(glue::glue("{sm},"), test$X14))
   temp_alt_ct <- data.frame(sample = sm, alt_ct = alt_ct)
   if(!exists("sm_alt_ct")){
     sm_alt_ct <- temp_alt_ct
@@ -91,6 +98,10 @@ for(sm in sample_names){
   }
 }
 
+write_tsv(sm_alt_ct, glue::glue("{data_dir}ALT_Per_Strain.tsv"),col_names = T)
+
+alt_ct <- data.table::fread( glue::glue("{data_dir}ALT_Per_Strain.tsv"))
+
 isolation_info <- googlesheets::gs_key("1V6YHzblaDph01sFDI8YK_fP0H7sVebHQTXypGdiQIjI") %>%
   googlesheets::gs_read("WI C. elegans") %>%
   dplyr::filter(reference_strain == 1)%>%
@@ -98,7 +109,7 @@ isolation_info <- googlesheets::gs_key("1V6YHzblaDph01sFDI8YK_fP0H7sVebHQTXypGdi
   dplyr::filter(lat != "None")%>%
   dplyr::filter(!is.na(lat)) %>%
   dplyr::distinct(sample, long, lat, .keep_all = TRUE) %>%
-  dplyr::left_join(sm_alt_ct, ., by = "sample") %>%
+  dplyr::left_join(alt_ct, ., by = "sample") %>%
   dplyr::arrange((alt_ct)) %>%
   dplyr::mutate(size_point = scale(1:n())) %>%
   dplyr::mutate(size_point = ifelse(size_point <= quantile(size_point, probs = 0.90), 1, 2),
@@ -123,14 +134,14 @@ ggsave("Plots/Diversity/ALT_Count_World_Map.pdf", height = 10, width = 20)
 
 ggplot(isolation_info)+
   aes(x = (alt_ct)) +
-  geom_histogram()+
-  theme_bw(18) +
+  geom_histogram(binwidth = 5000)+
+  base_theme +
   labs(x = "ALT Count", y = "Number of strains")
 
-ggsave("Plots/Diversity/ALT_Count_histogram.pdf", height = 6, width = 8)
+ggsave("Plots/Diversity/ALT_Count_histogram.pdf", height = 6, width = 20)
 
 hi_eff <- test %>%
-  dplyr::group_by(CHROM) %>%
+  dplyr::group_by(X1) %>%
   dplyr::ungroup() %>%
   dplyr::filter(X7 == "HIGH", X6 != "bidirectional_gene_fusion") %>%
   dplyr::distinct(X9, X6, .keep_all = T)
@@ -142,49 +153,54 @@ hi_eff %>%
   dplyr::arrange(desc(ct)) %>%
   dplyr::filter(ct > 200) %>%
   dplyr::mutate(X6 = gsub("&","\n",X6)) %>%
-  dplyr::mutate(eff_type = factor(X6,levels = X6))%>%
+  dplyr::mutate(eff_type = factor(X6,levels = X6, labels = c("Frameshift", "Stop gain", "Splice donor", "Splice acceptor", "Start lost","Stop Lost\nSplice region",'Frameshift\nStart lost',"Stop Lost")))%>%
   ggplot()+
   aes(x = eff_type, y = ct)+
   geom_bar(stat = "identity") +
-  theme_bw(18) +
-  theme(axis.text.x = element_text(size =8))+
+  base_theme+
   labs(x = "SnpEff Prediction", y = "Count")
 
-ggsave("Plots/Diversity/Small_Variant_SnpEff_High.pdf", height = 6, width = 18)
+ggsave("Plots/Diversity/Small_Variant_SnpEff_High.pdf", height = 4, width = 12)
 
-# test %>%
-#   dplyr::group_by(CHROM) %>%
-#   dplyr::ungroup() %>%
-#   dplyr::mutate(X7 = ifelse(is.na(X7), "INTERGENIC", X7)) %>%
-#   ggplot()+
-#   aes(x = freq_alt,fill = X7)+
-#   geom_density(binwidth = 0.01, alpha = 0.5)+
-#   theme_bw(18) +
-#   # facet_grid(X7~.)+
-#   theme(axis.text.x = element_text(size =8))+
-#   labs(x = "SnpEff Prediction", y = "Count")
-
+#total variants
+nrow(test)
+#[1] 2655588
+# intergenic
+sum(is.na(test$X6))
+# [1] 931059
+# intronic
+test%>%dplyr::filter(X6 == "intron_variant") %>% nrow()
+# [1] 968214
+# fraction intergenic/intronic
+(931059+968214)/2655588
+# [1] 0.7151987
+# missense
+test%>%dplyr::filter(X6 == "missense_variant") %>% nrow()
+# [1] 240236
+# high
+test%>%dplyr::filter(X7 == "HIGH") %>% nrow()
 
 # Distribution of high impact variation
 hi_eff %>%
   dplyr::group_by(X6) %>%
   dplyr::mutate(ct = n()) %>%
   dplyr::arrange(desc(ct)) %>%
-  dplyr::filter(ct > 200, CHROM!="MtDNA") %>%
+  dplyr::filter(ct > 200, X1!="MtDNA") %>%
   dplyr::ungroup()%>%
-  dplyr::distinct(CHROM, POS, .keep_all = T) %>%
+  dplyr::distinct(X1, X2, .keep_all = T) %>%
   dplyr::mutate(X6 = gsub("&","\n",X6)) %>%
   dplyr::mutate(eff_type = factor(X6,levels = unique(X6)))%>%
   ggplot()+
-  aes(x = POS/1e6, y = freq_alt)+
+  aes(x = X2/1e6, y = X11)+
   geom_point(alpha = 0.5)+
-  facet_grid(.~CHROM, space = "free", scales = "free")+
-  theme_bw(18) +
+  facet_grid(.~X1, space = "free", scales = "free")+
+  base_theme +
   labs(x = "Genomic Position (Mb)", y = "Count")+
   theme(strip.background = element_blank(),
-        strip.text = element_text(face = "bold"))
+        strip.text = element_text(face = "bold"),
+        axis.line = element_line())
 
-ggsave("Plots/Diversity/Small_Variant_SnpEff_High_Distribution.pdf", height = 6, width = 18)
+ggsave("Plots/Diversity/Small_Variant_SnpEff_High_Distribution.pdf", height = 4, width = 12)
 
 # unique genes with predicted LOF
 length(unique(hi_eff$X9))
@@ -214,9 +230,10 @@ multi_support_sv %>%
   aes(x = as.numeric(START)/1e6, fill = SVTYPE_CLEAN) +
   geom_histogram(binwidth = 0.15)+
   facet_grid(.~CHROM, scales = "free")+
-  theme_bw(18) +
+  base_theme+
   theme(strip.background = element_blank(),
-        strip.text = element_text(face = "bold"))+
+        strip.text = element_text(face = "bold"),
+        axis.line = element_line())+
   scale_fill_manual(values =c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"))+
   labs(x = "Genomic Position (Mb)", fill = "SVTYPE", y = "Count") 
 
@@ -238,7 +255,7 @@ multi_support_sv %>%
   aes(x = SVTYPE_CLEAN, y = log(SIZE), fill = SVTYPE_CLEAN)+
   geom_boxplot() +
   scale_fill_manual(values =c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
-  theme_bw(18)+
+  base_theme+
   theme(axis.title.x = element_blank())+
   labs(fill = "SVTYPE")
 ggsave("Plots/Diversity/Structural_size_boxplot.pdf", height = 4, width = 8)
@@ -276,7 +293,7 @@ multi_support_sv %>%
   ggplot()+
   aes(x = st_ct)+
   geom_histogram(binwidth = 0.01)+
-  theme_bw(18)+
+  base_theme+
   labs(x = "Structural Variant Frequency", y = "Count")
 
 ggsave("Plots/Diversity/Structural_Variant_Frequency.pdf", height = 4, width = 8)
@@ -330,6 +347,15 @@ multi_support_sv %>%
   dplyr::ungroup()%>%
   dplyr::mutate(u_genes = length(unique(TRANSCRIPT)))
 
+sv_genes <- multi_support_sv %>%
+  dplyr::distinct(CHROM, START, END, .keep_all = T) %>%
+  dplyr::mutate(clean_region = ifelse(SNPEFF_PRED == "intron_variant", "intron", 
+                                      ifelse(TRANSCRIPT != "Intergenic", "genic","Intergenic")))%>%
+  dplyr::filter(clean_region == "genic",SNPEFF_EFF=="HIGH")%>%
+  dplyr::ungroup()%>%
+  dplyr::distinct(TRANSCRIPT)%>%
+  dplyr::pull(TRANSCRIPT)
+
 
 large_v %>%
   dplyr::mutate(SIZE = as.numeric(SIZE)) %>%
@@ -340,15 +366,15 @@ large_v %>%
   ggplot() +
   aes(x = as.numeric(START)/1e6, xend = as.numeric(END)/1e6, y=SIZE, yend=SIZE, color = SVTYPE_CLEAN) +
   geom_segment(size =1, arrow = arrow(length = unit(0.1,"cm")))+
-  facet_grid(CHROM~HIGH_EFF, scales = "free")+
-  theme_bw(18) +
+  facet_grid(HIGH_EFF~CHROM, scales = "free")+
+  base_theme +
   theme(strip.background = element_blank(),
         legend.position = "top",
         panel.grid.minor = element_blank(),
-        panel.background = element_rect(fill = "gray70"),
-        panel.grid = element_blank())+
+        panel.grid = element_blank(),
+        axis.line = element_line())+
   scale_color_manual(values =c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"))+
   labs(x = "Genomic Position (Mb)", color = "SVTYPE", y = "Structural Variant Size") 
 
-ggsave("Plots/Diversity/Structural_Variant_Distribution_by_type_size.pdf", height = 10, width = 18)
+ggsave("Plots/Diversity/Structural_Variant_Distribution_by_type_size.pdf", height = 8, width = 18)
 
